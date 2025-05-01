@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clicking Game with Shop</title>
+  <style>
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      font-family: sans-serif;
+      overflow: hidden;
+      background: url('https://images.unsplash.com/photo-1506765515384-028b60a970df') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    #authContainer, #gameContainer {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+    }
+
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    #clickButton {
+      background-color: red;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 30px 60px;
+      font-size: 24px;
+      cursor: pointer;
+      position: absolute;
+    }
+
+    #counter {
+      position: absolute;
+      top: 20px;
+      font-size: 20px;
+      color: #fff;
+      text-shadow: 1px 1px 2px black;
+    }
+
+    #leaderboard, #shop, #adminPanel {
+      position: absolute;
+      background: rgba(255,255,255,0.9);
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      width: 200px;
+    }
+
+    #leaderboard {
+      top: 60px;
+      right: 20px;
+    }
+
+    #shop {
+      top: 60px;
+      left: 20px;
+    }
+
+    #adminPanel {
+      bottom: 20px;
+      right: 20px;
+      display: none;
+    }
+
+    #leaderboard h3, #shop h3, #adminPanel h3 {
+      margin-top: 0;
+    }
+
+    #guy {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: blue;
+      border-radius: 50%;
+      display: none;
+    }
+
+    #changePassSection {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 10px;
+    }
+
+    #changePassSection input {
+      margin-bottom: 5px;
+    }
+
+    .adminInput {
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login UI -->
+  <div id="authContainer">
+    <h2>Click Game Login</h2>
+    <input type="text" id="username" placeholder="Username" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <button onclick="signup()">Sign Up</button>
+    <p id="authMessage"></p>
+  </div>
+
+  <!-- Game UI -->
+  <div id="gameContainer">
+    <div id="counter">Clicks: 0</div>
+
+    <div id="leaderboard">
+      <h3>🏆 Leaderboard</h3>
+      <ol id="leaderboardList"></ol>
+    </div>
+
+    <div id="shop">
+      <h3>🛒 Shop</h3>
+      <button onclick="buyGuy()">👤 Guy (100 pts)</button><br>
+      <button onclick="buyDog()">🐶 Dog ×2 (200 pts)</button><br>
+      <button onclick="buyHole()">🌀 Black Hole ×5 (1000 pts)</button><br>
+      <button onclick="buyJesus()">✝️ Jesus (10000 pts)</button>
+    </div>
+
+    <div id="adminPanel">
+      <h3>🔧 Admin Panel</h3>
+      <div class="adminInput">
+        <input type="text" id="banUsername" placeholder="Username to Ban">
+        <button onclick="banUser()">Ban User</button>
+      </div>
+      <div class="adminInput">
+        <input type="text" id="givePointsUsername" placeholder="Username to Give Points">
+        <input type="number" id="givePointsAmount" placeholder="Amount" />
+        <button onclick="givePoints()">Give Points</button>
+      </div>
+      <div class="adminInput">
+        <input type="text" id="deletePointsUsername" placeholder="Username to Delete Points">
+        <input type="number" id="deletePointsAmount" placeholder="Amount" />
+        <button onclick="deletePoints()">Delete Points</button>
+      </div>
+      <button onclick="resetLeaderboard()">Reset Leaderboard</button>
+      <button onclick="showAllUsers()">View All Users</button>
+      <div id="userList"></div>
+    </div>
+
+    <div id="guy"></div>
+    <button id="clickButton">Click Me!</button>
+  </div>
+
+  <div id="changePassSection">
+    <h3>🔑 Change Password</h3>
+    <input type="password" id="oldPass" placeholder="Old Password"><br><br>
+    <input type="password" id="newPass" placeholder="New Password"><br><br>
+    <button onclick="changePassword()">Change</button>
+    <p id="passChangeMessage" style="margin:0; font-size:14px;"></p>
+  </div>
+
+  <script>
+    const authContainer = document.getElementById('authContainer');
+    const gameContainer = document.getElementById('gameContainer');
+    const clickButton = document.getElementById('clickButton');
+    const counter = document.getElementById('counter');
+    const leaderboardList = document.getElementById('leaderboardList');
+    const authMessage = document.getElementById('authMessage');
+    const guy = document.getElementById('guy');
+    const adminPanel = document.getElementById('adminPanel');
+    const ADMIN_USERNAME = 'happycatmeme159';
+
+    let currentUser = null;
+    let count = 0;
+    let multiplier = 1;
+    let hasGuy = false;
+    let hasDog = false;
+    let hasHole = false;
+    let hasJesus = false;
+    let jesusInterval = null;
+
+    window.onload = () => {
+      authContainer.style.display = 'flex';
+    };
+
+    function signup() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username || !password) return authMessage.textContent = 'Fill both fields.';
+      if (localStorage.getItem(username)) {
+        authMessage.textContent = 'User already exists!';
+      } else {
+        localStorage.setItem(username, JSON.stringify({ password, score: 0, upgrades: {} }));
+        authMessage.textContent = 'Signed up! Now log in.';
+      }
+    }
+
+    function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const user = JSON.parse(localStorage.getItem(username));
+      if (user && user.password === password) {
+        currentUser = username;
+        count = user.score || 0;
+        loadUpgrades(user.upgrades || {});
+        counter.textContent = `Clicks: ${count}`;
+        startGame();
+        if (currentUser === ADMIN_USERNAME) {
+          adminPanel.style.display = 'block';
+        }
+      } else {
+        authMessage.textContent = 'Invalid username or password.';
+      }
+    }
+
+    function loadUpgrades(upgrades) {
+      if (upgrades.guy) enableGuy();
+      if (upgrades.dog) { hasDog = true; multiplier *= 2; }
+      if (upgrades.hole) { hasHole = true; multiplier *= 5; }
+      if (upgrades.jesus) { hasJesus = true; summonJesus(); }
+    }
+
+    function startGame() {
+      authContainer.style.display = 'none';
+      gameContainer.style.display = 'block';
+      moveButton();
+      updateLeaderboard();
+    }
+
+    function moveButton() {
+      const maxX = window.innerWidth - clickButton.offsetWidth;
+      const maxY = window.innerHeight - clickButton.offsetHeight;
+      const randomX = Math.floor(Math.random() * maxX);
+      const randomY = Math.floor(Math.random() * maxY);
+      clickButton.style.left = `${randomX}px`;
+      clickButton.style.top = `${randomY}px`;
+    }
+
+    function updateLeaderboard() {
+      const allUsers = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          if (data && data.score !== undefined) {
+            allUsers.push({ username: key, score: data.score });
+          }
+        } catch (e) {}
+      }
+      allUsers.sort((a, b) => b.score - a.score);
+      leaderboardList.innerHTML = '';
+      allUsers.slice(0, 10).forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = `${user.username}: ${user.score}`;
+        leaderboardList.appendChild(li);
+      });
+    }
+
+    function updateScore() {
+      const userData = JSON.parse(localStorage.getItem(currentUser));
+      userData.score = count;
+      localStorage.setItem(currentUser, JSON.stringify(userData));
+      counter.textContent = `Clicks: ${count}`;
+      updateLeaderboard();
+    }
+
+    clickButton.addEventListener('click', () => {
+      count += multiplier;
+      updateScore();
+      moveButton();
+    });
+
+    window.addEventListener('resize', moveButton);
+
+    // --- Shop ---
+    function buyGuy() {
+      if (count >= 100 && !hasGuy) {
+        count -= 100;
+        enableGuy();
+        saveUpgrade('guy');
+        updateScore();
+      }
+    }
+
+    function buyDog() {
+      if (count >= 200 && !hasDog) {
+        count -= 200;
+        hasDog = true;
+        multiplier *= 2;
+        saveUpgrade('dog');
+        updateScore();
+      }
+    }
+
+    function buyHole() {
+      if (count >= 1000 && !hasHole) {
+        count -= 1000;
+        hasHole = true;
+        multiplier *= 5;
+        saveUpgrade('hole');
+        updateScore();
+      }
+    }
+
+    function buyJesus() {
+      if (count >= 10000 && !hasJesus) {
+        count -= 10000;
+        hasJesus = true;
+        saveUpgrade('jesus');
+        updateScore();
+        summonJesus();
+      }
+    }
+
+    function summonJesus() {
+      jesusInterval = setInterval(() => {
+        count += multiplier;
+        updateScore();
+        moveButton();
+      }, 1);
+    }
+
+    function saveUpgrade(type) {
+      const userData = JSON.parse(localStorage.getItem(currentUser));
+      userData.upgrades = userData.upgrades || {};
+      userData.upgrades[type] = true;
+      localStorage.setItem(currentUser, JSON.stringify(userData));
+    }
+
+    function enableGuy() {
+      hasGuy = true;
+      guy.style.display = 'block';
+      guy.style.left = '0px';
+      guy.style.top = '0px';
+      moveGuy();
+    }
+
+    function moveGuy() {
+      setInterval(() => {
+        if (!hasGuy) return;
+        const gx = parseFloat(guy.style.left);
+        const gy = parseFloat(guy.style.top);
+        guy.style.left = `${gx + 1}px`;
+        guy.style.top = `${gy + 1}px`;
+      }, 50);
+    }
+
+    // --- Admin Panel Functions ---
+    function banUser() {
+      const usernameToBan = document.getElementById('banUsername').value.trim();
+      if (!usernameToBan || usernameToBan === currentUser) {
+        alert('Invalid username.');
+        return;
+      }
+      localStorage.removeItem(usernameToBan);
+      alert(`${usernameToBan} has been banned.`);
+    }
+
+    function givePoints() {
+      const username = document.getElementById('givePointsUsername').value.trim();
+      const points = parseInt(document.getElementById('givePointsAmount').value);
+      if (isNaN(points) || points <= 0 || !username) {
+        alert('Invalid input.');
+        return;
+      }
+      const userData = JSON.parse(localStorage.getItem(username));
+      if (userData) {
+        userData.score += points;
+        localStorage.setItem(username, JSON.stringify(userData));
+        alert(`Given ${points} points to ${username}.`);
+        updateLeaderboard();
+      } else {
+        alert('User not found.');
+      }
+    }
+
+    function deletePoints() {
+      const username = document.getElementById('deletePointsUsername').value.trim();
+      const points = parseInt(document.getElementById('deletePointsAmount').value);
+      if (isNaN(points) || points <= 0 || !username) {
+        alert('Invalid input.');
+        return;
+      }
+      const userData = JSON.parse(localStorage.getItem(username));
+      if (userData) {
+        userData.score = Math.max(userData.score - points, 0);
+        localStorage.setItem(username, JSON.stringify(userData));
+        alert(`Deleted ${points} points from ${username}.`);
+        updateLeaderboard();
+      } else {
+        alert('User not found.');
+      }
+    }
+
+    function resetLeaderboard() {
+      localStorage.clear();
+      updateLeaderboard();
+    }
+
+    function showAllUsers() {
+      const userListDiv = document.getElementById('userList');
+      userListDiv.innerHTML = ''; // clear previous list
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const userData = JSON.parse(localStorage.getItem(key));
+        if (userData && userData.score !== undefined) {
+          const userDiv = document.createElement('div');
+          userDiv.textContent = `${key} - Score: ${userData.score}`;
+          userListDiv.appendChild(userDiv);
+        }
+      }
+    }
+
+    // --- Change Password ---
+    function changePassword() {
+      const oldPass = document.getElementById('oldPass').value;
+      const newPass = document.getElementById('newPass').value;
+      const msg = document.getElementById('passChangeMessage');
+
+      if (!oldPass || !newPass) {
+        msg.textContent = "Please fill in both fields.";
+        return;
+      }
+
+      const userData = JSON.parse(localStorage.getItem(currentUser));
+      if (userData.password !== oldPass) {
+        msg.textContent = "Old password is incorrect.";
+        return;
+      }
+
+      userData.password = newPass;
+      localStorage.setItem(currentUser, JSON.stringify(userData));
+      msg.textContent = "Password changed successfully!";
+    }
+  </script>
+</body>
+</html>
